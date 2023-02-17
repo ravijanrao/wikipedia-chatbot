@@ -8,61 +8,56 @@ from langchain.agents import initialize_agent, Tool, load_tools
 from langchain import SQLDatabase, SQLDatabaseChain
 from gpt_index import GPTSimpleVectorIndex, WikipediaReader
 from sqlalchemy import create_engine
-
+import os
 
 # From here down is all the StreamLit UI.
 st.set_page_config(
-    page_title="Snowflake + Wikipedia + Langchain Demo", page_icon=":bird:"
+    page_title="Wikipedia + Langchain Demo", page_icon=":bird:"
 )
-st.header("Snowflake + Wikipedia + LLM Demo")
+st.header(" Wikipedia + LLM Demo")
 st.write(
     "👋 This is a demo of connecting large language models to external data sources to give it specialized knowledge (e.g. company transaction data) and reduce hallucinations."
 )
 st.write(
     "🤖 The chatbot is built with LangChain (agents) and GPT Index (connect to data sources)."
 )
-
-st.write("Examples you can try:")
-st.write("- What was the average size of transactions in January?")
-st.write("- How much did Bill Gates spend on transactions and where did he grow up?")
-st.write("- What was the largest transaction? Who made that transaction?")
-st.write(
-    "- Who were the celebrities that purchased, and how much did they spend in total?"
-)
-st.write("- Did Bill Gates or Elon Musk spend more relative to their net worth?")
-
 st.sidebar.title("Data Sources")
 
-llm = OpenAI(temperature=0)
+OPENAI_API_KEY = st.secrets['OPENAI_API_KEY']['OPENAI_API_KEY']
+os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
+
+llm = OpenAI(temperature=0, openai_api_key=OPENAI_API_KEY)
+
+print("LLM SUCCESS \n \n")
 
 # Connect to Snowflake and build the chain
-@st.experimental_singleton
-def build_snowflake_chain():
-    engine = create_engine(
-        "snowflake://{user}:{password}@{account}/{database}/{schema}?warehouse={warehouse}".format(
-            **st.secrets["snowflake"]
-        )
-    )
+# @st.cache_resource
+# def build_snowflake_chain():
+#     engine = create_engine(
+#         "snowflake://{user}:{password}@{account}/{database}/{schema}?warehouse={warehouse}".format(
+#             **st.secrets["snowflake"]
+#         )
+#     )
 
-    sql_database = SQLDatabase(engine)
+#     sql_database = SQLDatabase(engine)
 
-    st.sidebar.header("❄️ Snowflake database has been connected")
-    st.sidebar.write(f"{sql_database.table_info}")
+#     st.sidebar.header("❄️ Snowflake database has been connected")
+#     st.sidebar.write(f"{sql_database.table_info}")
 
-    db_chain = SQLDatabaseChain(llm=llm, database=sql_database)
-    return db_chain
+#     db_chain = SQLDatabaseChain(llm=llm, database=sql_database)
+#     return db_chain
 
 
 # Parse and Index the Wiki Pages
-@st.experimental_singleton
+@st.cache_resource
 def build_index(input):
     pages = [p.strip() for p in input.split(",") if p != ""]
     wiki_docs = WikipediaReader().load_data(pages=pages) if input else []
-    return GPTSimpleVectorIndex(wiki_docs), pages
+    return GPTSimpleVectorIndex(wiki_docs, ), pages
 
 
 # Snowflake tool
-db_chain = build_snowflake_chain()
+# db_chain = build_snowflake_chain()
 
 st.sidebar.write("")
 
@@ -78,11 +73,11 @@ if len(wiki_pages) > 0:
     st.sidebar.write(f"{len(wiki_pages)} articles have been parsed and indexed")
 
 tools = [
-    Tool(
-        name="Snowflake Transactions",
-        func=lambda q: db_chain.run(q),
-        description=f"Useful when you want to answer questions about people's spending, purchases, and transactions. The input to this tool should be a complete english sentence. The celebrities are: Ruth Porat, Bill Gates, Warren Buffet, Elon Musk, Susan Wojcicki.",
-    ),
+    # Tool(
+    #     name="Snowflake Transactions",
+    #     func=lambda q: db_chain.run(q),
+    #     description=f"Useful when you want to answer questions about people's spending, purchases, and transactions. The input to this tool should be a complete english sentence. The celebrities are: Ruth Porat, Bill Gates, Warren Buffet, Elon Musk, Susan Wojcicki.",
+    # ),
     Tool(
         name="Wiki GPT Index",
         func=lambda q: str(index.query(q, similarity_top_k=1)),
